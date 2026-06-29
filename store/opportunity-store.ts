@@ -28,6 +28,7 @@ type OpportunityState = {
   experiments: Experiment[];
   isLoading: boolean;
   loadAll: () => Promise<void>;
+  seedDefaultSources: () => Promise<void>;
   addSource: (input: SourceInput) => Promise<number>;
   updateSource: (id: number, updates: Partial<Source>) => Promise<void>;
   deleteSource: (id: number) => Promise<void>;
@@ -85,10 +86,16 @@ async function ensureDefaultSources() {
   const timestamp = now();
 
   for (const source of defaultSources) {
-    const existing = await db.sources.where("name").equals(source.name).first();
+    const existingByUrl = await db.sources.where("url").equals(source.url).first();
+    const existing = existingByUrl ?? (await db.sources.where("name").equals(source.name).first());
     if (existing) {
       await db.sources.update(existing.id as number, {
+        name: existing.name || source.name,
+        type: existing.type || source.type,
         sourceProfile: existing.sourceProfile ?? source.sourceProfile,
+        keywords: existing.keywords?.length ? existing.keywords : source.keywords,
+        refreshInterval: existing.refreshInterval || source.refreshInterval,
+        enabled: existing.enabled ?? source.enabled,
         updatedAt: existing.updatedAt ?? timestamp,
       });
       continue;
@@ -166,6 +173,11 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
       experiments,
       isLoading: false,
     });
+  },
+
+  seedDefaultSources: async () => {
+    await ensureDefaultSources();
+    await get().loadAll();
   },
 
   addSource: async (input) => {

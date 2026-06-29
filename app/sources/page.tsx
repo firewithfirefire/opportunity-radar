@@ -33,6 +33,7 @@ export default function SourcesPage() {
     rawItems,
     isLoading,
     loadAll,
+    seedDefaultSources,
     addSource,
     updateSource,
     deleteSource,
@@ -105,6 +106,12 @@ export default function SourcesPage() {
     } finally {
       setCollectingId(null);
     }
+  }
+
+  async function addDefaultSources() {
+    setMessage("");
+    await seedDefaultSources();
+    setMessage("默认来源已补齐");
   }
 
   return (
@@ -200,10 +207,16 @@ export default function SourcesPage() {
           <section className="rounded-md border border-neutral-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3">
               <h2 className="text-base font-semibold text-neutral-950">来源列表</h2>
-              <button className={secondaryButtonClass} onClick={runAll} disabled={collectingId !== null || sources.length === 0}>
-                <RefreshCcw size={16} />
-                收集全部
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button className={secondaryButtonClass} onClick={addDefaultSources} disabled={collectingId !== null}>
+                  <Plus size={16} />
+                  添加默认来源
+                </button>
+                <button className={secondaryButtonClass} onClick={runAll} disabled={collectingId !== null || sources.length === 0}>
+                  <RefreshCcw size={16} />
+                  收集全部
+                </button>
+              </div>
             </div>
 
             {message ? <div className="border-b border-neutral-100 px-4 py-3 text-sm text-neutral-600">{message}</div> : null}
@@ -211,7 +224,13 @@ export default function SourcesPage() {
             {isLoading ? (
               <div className="p-8 text-center text-sm text-neutral-500">读取来源中...</div>
             ) : sources.length === 0 ? (
-              <div className="p-8 text-center text-sm text-neutral-500">还没有来源。</div>
+              <div className="grid gap-3 p-8 text-center text-sm text-neutral-500">
+                <span>还没有来源。</span>
+                <button className={`${secondaryButtonClass} mx-auto`} onClick={addDefaultSources}>
+                  <Plus size={16} />
+                  添加默认来源
+                </button>
+              </div>
             ) : (
               <div className="divide-y divide-neutral-100">
                 {sources.map((source) => (
