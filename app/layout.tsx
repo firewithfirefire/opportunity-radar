@@ -18,14 +18,14 @@ export default function RootLayout({
       <body>
         <div className="min-h-screen">
           <header className="border-b border-neutral-200 bg-[#fbfbf8]">
-            <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-4">
               <Link href="/opportunities" className="flex items-center gap-2 text-sm font-semibold text-neutral-950">
                 <span className="grid size-8 place-items-center rounded-md bg-neutral-950 text-white">
                   <BarChart3 size={17} />
                 </span>
                 Opportunity Radar
               </Link>
-              <nav className="flex items-center gap-2 text-sm">
+              <nav className="flex max-w-full items-center gap-2 overflow-x-auto text-sm">
                 <Link href="/sources" className="inline-flex min-h-9 items-center gap-2 rounded-md px-3 text-neutral-600 hover:bg-white hover:text-neutral-950">
                   <Radar size={15} />
                   收集中心

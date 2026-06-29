@@ -127,8 +127,8 @@ export default function SourcesPage() {
         }
       />
 
-      <div className="grid gap-5 lg:grid-cols-[380px_1fr]">
-        <form onSubmit={onSubmit} className="grid content-start gap-5 rounded-md border border-neutral-200 bg-[#fbfbf8] p-5">
+      <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)]">
+        <form onSubmit={onSubmit} className="grid min-w-0 content-start gap-5 rounded-md border border-neutral-200 bg-[#fbfbf8] p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-neutral-950">新增来源</h2>
             <button type="submit" className={buttonClass} disabled={isSaving || !form.name.trim() || !form.url.trim()}>
@@ -203,8 +203,8 @@ export default function SourcesPage() {
           </label>
         </form>
 
-        <div className="grid content-start gap-5">
-          <section className="rounded-md border border-neutral-200 bg-white">
+        <div className="grid min-w-0 content-start gap-5">
+          <section className="min-w-0 rounded-md border border-neutral-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-4 py-3">
               <h2 className="text-base font-semibold text-neutral-950">来源列表</h2>
               <div className="flex flex-wrap gap-2">
@@ -234,7 +234,7 @@ export default function SourcesPage() {
             ) : (
               <div className="divide-y divide-neutral-100">
                 {sources.map((source) => (
-                  <article key={source.id} className="grid gap-3 px-4 py-4 md:grid-cols-[1fr_110px_92px_42px] md:items-center">
+                  <article key={source.id} className="grid min-w-0 gap-3 px-4 py-4 xl:grid-cols-[minmax(0,1fr)_130px_92px_42px] xl:items-center">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-neutral-950">{source.name}</div>
                       <div className="mt-1 truncate text-xs text-neutral-500">{source.lastFetchStatus || source.url}</div>
@@ -255,7 +255,7 @@ export default function SourcesPage() {
                     >
                       <Trash2 size={16} />
                     </button>
-                    <label className="flex items-center gap-2 text-xs text-neutral-500 md:col-span-4">
+                    <label className="flex items-center gap-2 text-xs text-neutral-500 xl:col-span-4">
                       <input
                         type="checkbox"
                         checked={source.enabled}
@@ -270,7 +270,7 @@ export default function SourcesPage() {
             )}
           </section>
 
-          <section className="rounded-md border border-neutral-200 bg-white">
+          <section className="min-w-0 rounded-md border border-neutral-200 bg-white">
             <div className="border-b border-neutral-200 px-4 py-3">
               <h2 className="text-base font-semibold text-neutral-950">最近原始线索</h2>
             </div>
