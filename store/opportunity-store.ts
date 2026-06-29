@@ -4,6 +4,7 @@ import { create } from "zustand";
 import { db } from "@/lib/db";
 import { calculateNetProfit, calculateRecommendation, calculateTotalScore } from "@/lib/calculations";
 import { fetchSource } from "@/lib/fetch-source";
+import { parseOpportunity } from "@/lib/parser";
 import {
   emptyScore,
   type Experiment,
@@ -12,9 +13,12 @@ import {
   type OpportunityAnalysis,
   type OpportunityInput,
   type OpportunityScore,
+  type OpportunityType,
   type RawItem,
+  type SignalType,
   type Source,
   type SourceInput,
+  type SourceProfile,
 } from "@/types/opportunity";
 
 type OpportunityState = {
@@ -27,9 +31,10 @@ type OpportunityState = {
   addSource: (input: SourceInput) => Promise<number>;
   updateSource: (id: number, updates: Partial<Source>) => Promise<void>;
   deleteSource: (id: number) => Promise<void>;
-  collectSource: (id: number) => Promise<{ rawCount: number; opportunityCount: number }>;
-  collectEnabledSources: () => Promise<{ rawCount: number; opportunityCount: number }>;
-  collectDueSources: () => Promise<{ rawCount: number; opportunityCount: number }>;
+  collectSource: (id: number) => Promise<{ rawCount: number; newRawCount: number }>;
+  collectEnabledSources: () => Promise<{ rawCount: number; newRawCount: number }>;
+  collectDueSources: () => Promise<{ rawCount: number; newRawCount: number }>;
+  createOpportunityFromRawItem: (rawItemId: number) => Promise<number>;
   addOpportunity: (input: OpportunityInput) => Promise<number>;
   updateOpportunity: (id: number, updates: Partial<Opportunity>) => Promise<void>;
   deleteOpportunity: (id: number) => Promise<void>;
@@ -44,6 +49,48 @@ type OpportunityState = {
 };
 
 const now = () => new Date().toISOString();
+const defaultSourceProfile: SourceProfile = "general_news_source";
+
+function normalizeRawItem(item: RawItem): RawItem {
+  return {
+    ...item,
+    signalType: item.signalType ?? "other",
+    signalScore: item.signalScore ?? 0,
+    confidenceScore: item.confidenceScore ?? 0,
+    noiseScore: item.noiseScore ?? 0,
+    matchedWeakKeywords: item.matchedWeakKeywords ?? [],
+    matchedStrongKeywords: item.matchedStrongKeywords ?? item.matchedKeywords ?? [],
+    classificationReason: item.classificationReason ?? "旧数据：暂无分类说明",
+  };
+}
+
+function mapLegacyOpportunityType(value: unknown): OpportunityType {
+  const legacy = String(value || "other");
+  const map: Record<string, OpportunityType> = {
+    airdrop: "crypto_airdrop",
+    campaign: "exchange_task",
+    trading: "stock_event_watch",
+    yield: "cash_yield",
+    grant: "grant",
+    bounty: "bounty",
+    hackathon: "hackathon",
+    market_event: "stock_event_watch",
+    promotion: "broker_bonus",
+    other: "other",
+  };
+
+  return map[legacy] ?? (legacy as OpportunityType);
+}
+
+function normalizeOpportunity(opportunity: Opportunity & { type?: unknown }): Opportunity {
+  return {
+    ...opportunity,
+    opportunityType: opportunity.opportunityType ?? mapLegacyOpportunityType(opportunity.type),
+    riskScore: opportunity.riskScore ?? 0,
+    experimentScore: opportunity.experimentScore ?? 0,
+    confirmedByUser: opportunity.confirmedByUser ?? !opportunity.rawItemId,
+  };
+}
 
 export const useOpportunityStore = create<OpportunityState>((set, get) => ({
   sources: [],
@@ -60,13 +107,20 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
       db.opportunities.orderBy("updatedAt").reverse().toArray(),
       db.experiments.orderBy("createdAt").reverse().toArray(),
     ]);
-    set({ sources, rawItems, opportunities, experiments, isLoading: false });
+    set({
+      sources: sources.map((source) => ({ ...source, sourceProfile: source.sourceProfile ?? defaultSourceProfile })),
+      rawItems: rawItems.map(normalizeRawItem),
+      opportunities: opportunities.map((opportunity) => normalizeOpportunity(opportunity as Opportunity & { type?: unknown })),
+      experiments,
+      isLoading: false,
+    });
   },
 
   addSource: async (input) => {
     const timestamp = now();
     const id = await db.sources.add({
       ...input,
+      sourceProfile: input.sourceProfile ?? defaultSourceProfile,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -93,11 +147,11 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
       throw new Error("没有找到这个来源");
     }
 
-    const result = await fetchSource(source);
+    const result = await fetchSource({ ...source, sourceProfile: source.sourceProfile ?? defaultSourceProfile });
     const timestamp = now();
-    let opportunityCount = 0;
+    let newRawCount = 0;
 
-    await db.transaction("rw", db.sources, db.rawItems, db.opportunities, async () => {
+    await db.transaction("rw", db.sources, db.rawItems, async () => {
       for (const rawItem of result.rawItems) {
         const existing = rawItem.url
           ? await db.rawItems.where("url").equals(rawItem.url).first()
@@ -107,49 +161,33 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
           continue;
         }
 
-        const parsed = result.opportunities.find(
-          (opportunity) => opportunity.title === rawItem.title && opportunity.sourceUrl === rawItem.url,
-        );
-        const rawItemId = await db.rawItems.add({ ...rawItem, status: parsed ? "parsed" : "new" });
-
-        if (parsed) {
-          await db.opportunities.add({
-            ...parsed,
-            rawItemId,
-            analysis: {},
-            score: emptyScore,
-            totalScore: calculateTotalScore(emptyScore),
-            recommendation: calculateRecommendation(calculateTotalScore(emptyScore)),
-            createdAt: timestamp,
-            updatedAt: timestamp,
-          });
-          opportunityCount += 1;
-        }
+        await db.rawItems.add({ ...rawItem, status: "new" });
+        newRawCount += 1;
       }
 
       await db.sources.update(id, {
         lastFetchedAt: timestamp,
-        lastFetchStatus: `新增 ${opportunityCount} 个候选机会`,
+        lastFetchStatus: `新增 ${newRawCount} 条原始信息`,
         updatedAt: timestamp,
       });
     });
 
     await get().loadAll();
-    return { rawCount: result.rawItems.length, opportunityCount };
+    return { rawCount: result.rawItems.length, newRawCount };
   },
 
   collectEnabledSources: async () => {
     const enabled = get().sources.filter((source) => source.enabled && source.id);
     let rawCount = 0;
-    let opportunityCount = 0;
+    let newRawCount = 0;
 
     for (const source of enabled) {
       const result = await get().collectSource(source.id as number);
       rawCount += result.rawCount;
-      opportunityCount += result.opportunityCount;
+      newRawCount += result.newRawCount;
     }
 
-    return { rawCount, opportunityCount };
+    return { rawCount, newRawCount };
   },
 
   collectDueSources: async () => {
@@ -167,15 +205,57 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
       return nowMs - new Date(source.lastFetchedAt).getTime() >= intervalMs;
     });
     let rawCount = 0;
-    let opportunityCount = 0;
+    let newRawCount = 0;
 
     for (const source of dueSources) {
       const result = await get().collectSource(source.id as number);
       rawCount += result.rawCount;
-      opportunityCount += result.opportunityCount;
+      newRawCount += result.newRawCount;
     }
 
-    return { rawCount, opportunityCount };
+    return { rawCount, newRawCount };
+  },
+
+  createOpportunityFromRawItem: async (rawItemId) => {
+    const rawItem = await db.rawItems.get(rawItemId);
+    if (!rawItem) {
+      throw new Error("没有找到这条原始信息");
+    }
+
+    const existing = await db.opportunities.where("rawItemId").equals(rawItemId).first();
+    if (existing?.id) {
+      await db.opportunities.update(existing.id, { confirmedByUser: true, updatedAt: now() });
+      await db.rawItems.update(rawItemId, { status: "parsed" });
+      await get().loadAll();
+      return existing.id;
+    }
+
+    const parsed = parseOpportunity(normalizeRawItem(rawItem));
+    if (!parsed) {
+      throw new Error("这条原始信息没有匹配到关键词，暂时不能生成机会");
+    }
+
+    const timestamp = now();
+    const totalScore = calculateTotalScore(emptyScore);
+    const id = await db.transaction("rw", db.rawItems, db.opportunities, async () => {
+      const opportunityId = await db.opportunities.add({
+        ...parsed,
+        rawItemId,
+        status: "candidate",
+        analysis: {},
+        score: emptyScore,
+        totalScore,
+        recommendation: calculateRecommendation(totalScore),
+        confirmedByUser: true,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      });
+      await db.rawItems.update(rawItemId, { status: "parsed" });
+      return opportunityId;
+    });
+
+    await get().loadAll();
+    return id;
   },
 
   addOpportunity: async (input) => {
@@ -186,6 +266,9 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
       rawItemId: undefined,
       confidenceScore: 0,
       opportunityScore: 0,
+      riskScore: 0,
+      experimentScore: 0,
+      confirmedByUser: true,
       analysis: {},
       score: emptyScore,
       totalScore,

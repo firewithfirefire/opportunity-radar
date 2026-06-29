@@ -12,12 +12,29 @@ class OpportunityRadarDB extends Dexie {
   constructor() {
     super("OpportunityRadarDB");
 
-    this.version(3).stores({
-      sources: "++id, name, type, enabled, lastFetchedAt, updatedAt",
-      rawItems: "++id, title, url, sourceName, sourceType, publishedAt, fetchedAt, status",
-      opportunities: "++id, rawItemId, title, platform, type, status, totalScore, recommendation, createdAt, updatedAt",
+    this.version(5).stores({
+      sources: "++id, name, type, sourceProfile, enabled, lastFetchedAt, updatedAt",
+      rawItems: "++id, title, url, sourceName, sourceType, publishedAt, fetchedAt, signalType, signalScore, confidenceScore, noiseScore, status",
+      opportunities: "++id, rawItemId, title, platform, opportunityType, status, opportunityScore, riskScore, experimentScore, createdAt, updatedAt",
       experiments: "++id, opportunityId, startedAt, endedAt, netProfit, createdAt, updatedAt",
     });
+
+    this.version(6)
+      .stores({
+        sources: "++id, name, type, sourceProfile, enabled, lastFetchedAt, updatedAt",
+        rawItems: "++id, title, url, sourceName, sourceType, publishedAt, fetchedAt, signalType, signalScore, confidenceScore, noiseScore, status",
+        opportunities: "++id, rawItemId, title, platform, opportunityType, status, opportunityScore, riskScore, experimentScore, createdAt, updatedAt",
+        experiments: "++id, opportunityId, startedAt, endedAt, netProfit, createdAt, updatedAt",
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table("rawItems").clear();
+        await transaction.table("opportunities").clear();
+        await transaction.table("experiments").clear();
+        await transaction.table("sources").toCollection().modify((source) => {
+          delete source.lastFetchedAt;
+          source.lastFetchStatus = "旧数据已清空，等待重新抓取";
+        });
+      });
   }
 }
 

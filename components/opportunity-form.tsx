@@ -24,7 +24,7 @@ export function OpportunityForm() {
     title: "",
     sourceUrl: "",
     platform: "",
-    type: "other",
+    opportunityType: "other",
     description: "",
     windowStart: "",
     windowEnd: "",
@@ -68,7 +68,11 @@ export function OpportunityForm() {
           <input className={inputClass} value={form.platform} onChange={(event) => update("platform", event.target.value)} />
         </Field>
         <Field label="类型">
-          <select className={inputClass} value={form.type} onChange={(event) => update("type", event.target.value as OpportunityType)}>
+          <select
+            className={inputClass}
+            value={form.opportunityType}
+            onChange={(event) => update("opportunityType", event.target.value as OpportunityType)}
+          >
             {types.map((type) => (
               <option key={type} value={type}>
                 {typeLabels[type]}

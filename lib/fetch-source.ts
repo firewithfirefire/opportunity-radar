@@ -1,11 +1,10 @@
 "use client";
 
-import { findMatchedKeywords, parseOpportunity } from "@/lib/parser";
-import type { ParsedOpportunity, RawItem, Source } from "@/types/opportunity";
+import { classifyRawItem } from "@/lib/parser";
+import type { RawItem, Source } from "@/types/opportunity";
 
 type FetchResult = {
   rawItems: Array<Omit<RawItem, "id" | "status">>;
-  opportunities: ParsedOpportunity[];
 };
 
 function textFromHtml(html: string) {
@@ -35,7 +34,12 @@ function parseRss(xmlText: string, source: Source) {
       entry.querySelector("content")?.textContent?.trim() ||
       "";
     const rawText = textFromHtml(description || title);
-    const matchedKeywords = findMatchedKeywords(`${title}\n${rawText}`, source.keywords);
+    const classification = classifyRawItem({
+      title,
+      rawText,
+      sourceProfile: source.sourceProfile,
+      sourceKeywords: source.keywords,
+    });
 
     return {
       title,
@@ -45,7 +49,7 @@ function parseRss(xmlText: string, source: Source) {
       publishedAt,
       rawText,
       fetchedAt: new Date().toISOString(),
-      matchedKeywords,
+      ...classification,
     };
   });
 }
@@ -59,7 +63,12 @@ function parseApi(json: unknown, source: Source) {
     const url = typeof record.url === "string" ? record.url : undefined;
     const rawText = String(record.description || record.summary || record.content || record.body || JSON.stringify(record)).slice(0, 4000);
     const publishedAt = typeof record.publishedAt === "string" ? record.publishedAt : undefined;
-    const matchedKeywords = findMatchedKeywords(`${title}\n${rawText}`, source.keywords);
+    const classification = classifyRawItem({
+      title,
+      rawText,
+      sourceProfile: source.sourceProfile,
+      sourceKeywords: source.keywords,
+    });
 
     return {
       title,
@@ -69,7 +78,7 @@ function parseApi(json: unknown, source: Source) {
       publishedAt,
       rawText,
       fetchedAt: new Date().toISOString(),
-      matchedKeywords,
+      ...classification,
     };
   });
 }
@@ -80,6 +89,12 @@ export async function fetchSource(source: Source): Promise<FetchResult> {
   if (source.type === "manual_text") {
     const title = source.name;
     const rawText = source.url;
+    const classification = classifyRawItem({
+      title,
+      rawText,
+      sourceProfile: source.sourceProfile,
+      sourceKeywords: source.keywords,
+    });
     rawItems = [
       {
         title,
@@ -87,7 +102,7 @@ export async function fetchSource(source: Source): Promise<FetchResult> {
         sourceType: source.type,
         rawText,
         fetchedAt: new Date().toISOString(),
-        matchedKeywords: findMatchedKeywords(`${title}\n${rawText}`, source.keywords),
+        ...classification,
       },
     ];
   } else {
@@ -104,6 +119,12 @@ export async function fetchSource(source: Source): Promise<FetchResult> {
       const html = await response.text();
       const title = new DOMParser().parseFromString(html, "text/html").title || source.name;
       const rawText = textFromHtml(html).slice(0, 6000);
+      const classification = classifyRawItem({
+        title,
+        rawText,
+        sourceProfile: source.sourceProfile,
+        sourceKeywords: source.keywords,
+      });
       rawItems = [
         {
           title,
@@ -112,15 +133,11 @@ export async function fetchSource(source: Source): Promise<FetchResult> {
           sourceType: source.type,
           rawText,
           fetchedAt: new Date().toISOString(),
-          matchedKeywords: findMatchedKeywords(`${title}\n${rawText}`, source.keywords),
+          ...classification,
         },
       ];
     }
   }
 
-  const opportunities = rawItems
-    .map((item) => parseOpportunity({ ...item, status: "new" }))
-    .filter((item): item is NonNullable<typeof item> => Boolean(item));
-
-  return { rawItems, opportunities };
+  return { rawItems };
 }

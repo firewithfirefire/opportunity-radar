@@ -1,3 +1,5 @@
+import type { Recommendation } from "@/types/opportunity";
+
 export function clampScore(value: number) {
   if (Number.isNaN(value)) {
     return 0;
@@ -77,4 +79,3 @@ export function calculateNetProfit({
 }) {
   return Number((actualReward - actualFees - gasCost - slippageCost - timeCost).toFixed(2));
 }
-import type { Recommendation } from "@/types/opportunity";

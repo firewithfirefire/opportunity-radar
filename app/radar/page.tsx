@@ -2,20 +2,32 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, RefreshCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, RefreshCcw, Sparkles } from "lucide-react";
 import { PageTitle, secondaryButtonClass } from "@/components/ui";
 import { useOpportunityStore } from "@/store/opportunity-store";
-import { rawItemStatusLabels, sourceTypeLabels, type RawItemStatus, type SourceType } from "@/types/opportunity";
+import { rawItemStatusLabels, signalTypeLabels, sourceTypeLabels, type RawItemStatus, type SourceType } from "@/types/opportunity";
 
 const statuses = Object.keys(rawItemStatusLabels) as RawItemStatus[];
 const sourceTypes = Object.keys(sourceTypeLabels) as SourceType[];
 
 export default function RadarPage() {
-  const { rawItems, sources, isLoading, loadAll, collectEnabledSources, collectDueSources } = useOpportunityStore();
+  const router = useRouter();
+  const {
+    rawItems,
+    sources,
+    opportunities,
+    isLoading,
+    loadAll,
+    collectEnabledSources,
+    collectDueSources,
+    createOpportunityFromRawItem,
+  } = useOpportunityStore();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<RawItemStatus | "all">("all");
   const [sourceType, setSourceType] = useState<SourceType | "all">("all");
   const [isCollecting, setIsCollecting] = useState(false);
+  const [creatingId, setCreatingId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -45,7 +57,7 @@ export default function RadarPage() {
     setMessage("");
     try {
       const result = await collectEnabledSources();
-      setMessage(`收集完成：扫描 ${result.rawCount} 条，新增 ${result.opportunityCount} 个候选机会`);
+      setMessage(`收集完成：扫描 ${result.rawCount} 条，新增 ${result.newRawCount} 条原始信息`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "收集失败");
     } finally {
@@ -53,11 +65,24 @@ export default function RadarPage() {
     }
   }
 
+  async function createOpportunity(rawItemId: number) {
+    setCreatingId(rawItemId);
+    setMessage("");
+    try {
+      const opportunityId = await createOpportunityFromRawItem(rawItemId);
+      router.push(`/opportunities/${opportunityId}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "生成机会失败");
+    } finally {
+      setCreatingId(null);
+    }
+  }
+
   return (
     <>
       <PageTitle
         title="原始信息雷达"
-        description="查看从信息源抓到的 RawItem，再进入候选机会池筛选。"
+        description="查看所有抓取到的 RawItem；只有手动确认后才会进入机会池。"
         action={
           <button className={secondaryButtonClass} onClick={runCollection} disabled={isCollecting || sources.length === 0}>
             <RefreshCcw size={16} />
@@ -102,11 +127,14 @@ export default function RadarPage() {
       {message ? <div className="mb-5 rounded-md border border-neutral-200 bg-white p-3 text-sm text-neutral-600">{message}</div> : null}
 
       <section className="overflow-hidden rounded-md border border-neutral-200 bg-white">
-        <div className="grid grid-cols-[1fr_140px_120px_150px] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase text-neutral-500 max-lg:hidden">
+        <div className="grid grid-cols-[1fr_120px_90px_90px_90px_150px_110px] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase text-neutral-500 max-lg:hidden">
           <span>原始信息</span>
-          <span>来源</span>
+          <span>线索类型</span>
+          <span>相关性</span>
+          <span>置信</span>
+          <span>噪音</span>
           <span>关键词</span>
-          <span>时间</span>
+          <span />
         </div>
 
         {isLoading ? (
@@ -118,7 +146,7 @@ export default function RadarPage() {
         ) : (
           <div className="divide-y divide-neutral-100">
             {filtered.map((item) => (
-              <article key={item.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_140px_120px_150px] lg:items-center">
+              <article key={item.id} className="grid gap-3 px-4 py-4 lg:grid-cols-[1fr_120px_90px_90px_90px_150px_110px] lg:items-center">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h2 className="truncate text-sm font-semibold text-neutral-950">{item.title}</h2>
@@ -129,16 +157,33 @@ export default function RadarPage() {
                     ) : null}
                   </div>
                   <p className="mt-1 line-clamp-2 text-xs leading-5 text-neutral-500">{item.rawText}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-neutral-400">
+                    {item.sourceName} · {item.publishedAt || item.fetchedAt} · {item.classificationReason}
+                  </p>
                 </div>
-                <div className="text-sm text-neutral-600">{item.sourceName}</div>
+                <div className="text-sm text-neutral-600">{signalTypeLabels[item.signalType]}</div>
+                <div className="text-lg font-semibold text-neutral-950">{item.signalScore ?? 0}</div>
+                <div className="text-sm font-medium text-neutral-600">{item.confidenceScore ?? 0}</div>
+                <div className="text-sm font-medium text-red-700">{item.noiseScore ?? 0}</div>
                 <div className="flex flex-wrap gap-1">
-                  {item.matchedKeywords.slice(0, 3).map((keyword) => (
+                  {[...item.matchedStrongKeywords, ...item.matchedWeakKeywords].slice(0, 4).map((keyword) => (
                     <span key={keyword} className="rounded bg-neutral-100 px-1.5 py-1 text-xs text-neutral-600">
                       {keyword}
                     </span>
                   ))}
                 </div>
-                <div className="text-xs text-neutral-500">{item.publishedAt || item.fetchedAt}</div>
+                {opportunities.some((opportunity) => opportunity.rawItemId === item.id) || item.status === "parsed" ? (
+                  <span className="text-sm text-neutral-500">已生成</span>
+                ) : (
+                  <button
+                    className={secondaryButtonClass}
+                    onClick={() => item.id && createOpportunity(item.id)}
+                    disabled={!item.id || creatingId !== null}
+                  >
+                    <Sparkles size={15} />
+                    生成机会
+                  </button>
+                )}
               </article>
             ))}
           </div>

@@ -36,7 +36,7 @@ export default function OpportunitiesPage() {
           .filter(Boolean)
           .some((value) => value?.toLowerCase().includes(normalizedQuery));
       const matchesStatus = status === "all" || opportunity.status === status;
-      const matchesType = type === "all" || opportunity.type === type;
+      const matchesType = type === "all" || opportunity.opportunityType === type;
       const matchesScore = opportunity.opportunityScore >= Number(minScore || 0);
       return matchesQuery && matchesStatus && matchesType && matchesScore;
     });
@@ -101,12 +101,13 @@ export default function OpportunitiesPage() {
       </section>
 
       <section className="overflow-hidden rounded-md border border-neutral-200 bg-white">
-        <div className="grid grid-cols-[1fr_110px_110px_100px_110px_42px] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase text-neutral-500 max-lg:hidden">
+        <div className="grid grid-cols-[1fr_130px_100px_90px_90px_90px_42px] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-semibold uppercase text-neutral-500 max-lg:hidden">
           <span>机会</span>
           <span>类型</span>
-          <span>状态</span>
           <span>机会分</span>
-          <span>置信分</span>
+          <span>风险分</span>
+          <span>实验分</span>
+          <span>状态</span>
           <span />
         </div>
 
@@ -119,7 +120,7 @@ export default function OpportunitiesPage() {
             {filtered.map((opportunity) => (
               <article
                 key={opportunity.id}
-                className="grid gap-3 px-4 py-4 transition hover:bg-neutral-50 lg:grid-cols-[1fr_110px_110px_100px_110px_42px] lg:items-center"
+                className="grid gap-3 px-4 py-4 transition hover:bg-neutral-50 lg:grid-cols-[1fr_130px_100px_90px_90px_90px_42px] lg:items-center"
               >
                 <Link href={`/opportunities/${opportunity.id}`} className="min-w-0">
                   <div className="truncate text-sm font-semibold text-neutral-950">{opportunity.title}</div>
@@ -133,10 +134,11 @@ export default function OpportunitiesPage() {
                     ) : null}
                   </div>
                 </Link>
-                <div className="text-sm text-neutral-600">{typeLabels[opportunity.type]}</div>
-                <StatusBadge status={opportunity.status} />
+                <div className="text-sm text-neutral-600">{typeLabels[opportunity.opportunityType]}</div>
                 <div className="text-lg font-semibold text-neutral-950">{opportunity.opportunityScore}</div>
-                <div className="text-sm font-medium text-neutral-600">{opportunity.confidenceScore}</div>
+                <div className="text-sm font-medium text-red-700">{opportunity.riskScore}</div>
+                <div className="text-sm font-medium text-emerald-700">{opportunity.experimentScore}</div>
+                <StatusBadge status={opportunity.status} />
                 <button
                   className="grid size-9 place-items-center rounded-md text-neutral-400 hover:bg-red-50 hover:text-red-600"
                   title="删除"

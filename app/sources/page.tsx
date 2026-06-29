@@ -5,13 +5,22 @@ import Link from "next/link";
 import { Database, Play, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { buttonClass, Field, inputClass, PageTitle, secondaryButtonClass } from "@/components/ui";
 import { useOpportunityStore } from "@/store/opportunity-store";
-import { opportunityKeywords, sourceTypeLabels, type SourceInput, type SourceType } from "@/types/opportunity";
+import {
+  opportunityKeywords,
+  sourceProfileLabels,
+  sourceTypeLabels,
+  type SourceInput,
+  type SourceProfile,
+  type SourceType,
+} from "@/types/opportunity";
 
 const sourceTypes = Object.keys(sourceTypeLabels) as SourceType[];
+const sourceProfiles = Object.keys(sourceProfileLabels) as SourceProfile[];
 
 const emptyForm: SourceInput = {
   name: "",
   type: "rss",
+  sourceProfile: "general_news_source",
   url: "",
   enabled: true,
   keywords: opportunityKeywords.slice(0, 8),
@@ -77,7 +86,7 @@ export default function SourcesPage() {
     setMessage("");
     try {
       const result = await collectSource(id);
-      setMessage(`收集完成：扫描 ${result.rawCount} 条，新增 ${result.opportunityCount} 个候选机会`);
+      setMessage(`收集完成：扫描 ${result.rawCount} 条，新增 ${result.newRawCount} 条原始信息`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "收集失败");
     } finally {
@@ -90,7 +99,7 @@ export default function SourcesPage() {
     setMessage("");
     try {
       const result = await collectEnabledSources();
-      setMessage(`收集完成：扫描 ${result.rawCount} 条，新增 ${result.opportunityCount} 个候选机会`);
+      setMessage(`收集完成：扫描 ${result.rawCount} 条，新增 ${result.newRawCount} 条原始信息`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "收集失败");
     } finally {
@@ -102,7 +111,7 @@ export default function SourcesPage() {
     <>
       <PageTitle
         title="收集中心"
-        description="维护信息来源，把匹配关键词的内容沉淀成候选机会。"
+        description="维护信息来源；抓取结果先进入原始信息雷达，确认后再生成机会。"
         action={
           <Link href="/opportunities" className={secondaryButtonClass}>
             <Database size={16} />
@@ -131,6 +140,19 @@ export default function SourcesPage() {
                 {sourceTypes.map((type) => (
                   <option key={type} value={type}>
                     {sourceTypeLabels[type]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="来源画像">
+              <select
+                className={inputClass}
+                value={form.sourceProfile}
+                onChange={(event) => update("sourceProfile", event.target.value as SourceProfile)}
+              >
+                {sourceProfiles.map((profile) => (
+                  <option key={profile} value={profile}>
+                    {sourceProfileLabels[profile]}
                   </option>
                 ))}
               </select>
@@ -198,7 +220,7 @@ export default function SourcesPage() {
                       <div className="truncate text-sm font-semibold text-neutral-950">{source.name}</div>
                       <div className="mt-1 truncate text-xs text-neutral-500">{source.lastFetchStatus || source.url}</div>
                     </div>
-                    <div className="text-sm text-neutral-600">{sourceTypeLabels[source.type]}</div>
+                    <div className="text-sm text-neutral-600">{sourceProfileLabels[source.sourceProfile]}</div>
                     <button
                       className={secondaryButtonClass}
                       onClick={() => source.id && runOne(source.id)}
@@ -242,6 +264,7 @@ export default function SourcesPage() {
                     <div className="text-sm font-medium text-neutral-950">{item.title}</div>
                     <div className="mt-1 text-xs text-neutral-500">
                       {item.sourceName} · {item.matchedKeywords.join(", ") || "无关键词"}
+                      · 相关性 {item.signalScore ?? 0}
                     </div>
                   </article>
                 ))}

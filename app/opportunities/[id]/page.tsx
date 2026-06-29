@@ -48,13 +48,13 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
 
       <section className="mb-5 grid gap-4 md:grid-cols-4">
         <Metric label="机会分" value={String(opportunity.opportunityScore)} />
-        <Metric label="置信分" value={String(opportunity.confidenceScore)} />
+        <Metric label="风险分" value={String(opportunity.riskScore)} tone={opportunity.riskScore > 60 ? "bad" : "neutral"} />
+        <Metric label="实验分" value={String(opportunity.experimentScore)} tone={opportunity.experimentScore > 60 ? "good" : "neutral"} />
         <Metric
           label="累计净收益"
           value={totalNetProfit.toFixed(2)}
           tone={totalNetProfit > 0 ? "good" : totalNetProfit < 0 ? "bad" : "neutral"}
         />
-        <Metric label="实验次数" value={String(experiments.length)} />
       </section>
 
       <section className="mb-5 rounded-md border border-neutral-200 bg-[#fbfbf8] p-5">
@@ -65,7 +65,7 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
           </div>
           <div>
             <div className="text-xs text-neutral-400">类型</div>
-            <div className="mt-1 font-medium text-neutral-900">{typeLabels[opportunity.type]}</div>
+            <div className="mt-1 font-medium text-neutral-900">{typeLabels[opportunity.opportunityType]}</div>
           </div>
           <div>
             <div className="text-xs text-neutral-400">状态</div>
