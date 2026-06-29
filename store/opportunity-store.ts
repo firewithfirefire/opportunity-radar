@@ -84,10 +84,10 @@ const defaultSources: SourceInput[] = [
 
 async function ensureDefaultSources() {
   const timestamp = now();
+  const existingSources = await db.sources.toArray();
 
   for (const source of defaultSources) {
-    const existingByUrl = await db.sources.where("url").equals(source.url).first();
-    const existing = existingByUrl ?? (await db.sources.where("name").equals(source.name).first());
+    const existing = existingSources.find((item) => item.url === source.url || item.name === source.name);
     if (existing) {
       await db.sources.update(existing.id as number, {
         name: existing.name || source.name,

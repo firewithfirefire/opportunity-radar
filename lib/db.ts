@@ -35,6 +35,13 @@ class OpportunityRadarDB extends Dexie {
           source.lastFetchStatus = "旧数据已清空，等待重新抓取";
         });
       });
+
+    this.version(7).stores({
+      sources: "++id, name, url, type, sourceProfile, enabled, lastFetchedAt, updatedAt",
+      rawItems: "++id, title, url, sourceName, sourceType, publishedAt, fetchedAt, signalType, signalScore, confidenceScore, noiseScore, status",
+      opportunities: "++id, rawItemId, title, platform, opportunityType, status, opportunityScore, riskScore, experimentScore, createdAt, updatedAt",
+      experiments: "++id, opportunityId, startedAt, endedAt, netProfit, createdAt, updatedAt",
+    });
   }
 }
 
