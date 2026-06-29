@@ -83,6 +83,17 @@ function parseApi(json: unknown, source: Source) {
   });
 }
 
+async function fetchExternal(url: string) {
+  const response = await fetch(`/api/fetch-source?url=${encodeURIComponent(url)}`);
+  const payload = (await response.json()) as { body?: string; error?: string };
+
+  if (!response.ok || !payload.body) {
+    throw new Error(`抓取失败：${payload.error || `HTTP ${response.status}`}`);
+  }
+
+  return payload.body;
+}
+
 export async function fetchSource(source: Source): Promise<FetchResult> {
   let rawItems: Array<Omit<RawItem, "id" | "status">> = [];
 
@@ -106,17 +117,14 @@ export async function fetchSource(source: Source): Promise<FetchResult> {
       },
     ];
   } else {
-    const response = await fetch(source.url);
-    if (!response.ok) {
-      throw new Error(`抓取失败：HTTP ${response.status}`);
-    }
+    const body = await fetchExternal(source.url);
 
     if (source.type === "rss") {
-      rawItems = parseRss(await response.text(), source);
+      rawItems = parseRss(body, source);
     } else if (source.type === "api") {
-      rawItems = parseApi(await response.json(), source);
+      rawItems = parseApi(JSON.parse(body), source);
     } else {
-      const html = await response.text();
+      const html = body;
       const title = new DOMParser().parseFromString(html, "text/html").title || source.name;
       const rawText = textFromHtml(html).slice(0, 6000);
       const classification = classifyRawItem({

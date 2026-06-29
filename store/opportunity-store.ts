@@ -51,6 +51,57 @@ type OpportunityState = {
 const now = () => new Date().toISOString();
 const defaultSourceProfile: SourceProfile = "general_news_source";
 
+const defaultSources: SourceInput[] = [
+  {
+    name: "Hacker News",
+    type: "rss",
+    sourceProfile: "dev_tool_source",
+    url: "https://news.ycombinator.com/rss",
+    enabled: true,
+    keywords: ["ai", "startup", "open source", "funding", "launch", "product", "api", "tool"],
+    refreshInterval: 360,
+  },
+  {
+    name: "HN Jobs",
+    type: "rss",
+    sourceProfile: "general_news_source",
+    url: "https://hnrss.org/jobs",
+    enabled: true,
+    keywords: ["hiring", "remote", "contract", "freelance", "frontend", "ai", "startup"],
+    refreshInterval: 720,
+  },
+  {
+    name: "Cointelegraph",
+    type: "rss",
+    sourceProfile: "crypto_news_source",
+    url: "https://cointelegraph.com/rss",
+    enabled: true,
+    keywords: ["airdrop", "reward", "campaign", "token", "listing", "exchange", "launchpool", "ETF"],
+    refreshInterval: 360,
+  },
+];
+
+async function ensureDefaultSources() {
+  const timestamp = now();
+
+  for (const source of defaultSources) {
+    const existing = await db.sources.where("name").equals(source.name).first();
+    if (existing) {
+      await db.sources.update(existing.id as number, {
+        sourceProfile: existing.sourceProfile ?? source.sourceProfile,
+        updatedAt: existing.updatedAt ?? timestamp,
+      });
+      continue;
+    }
+
+    await db.sources.add({
+      ...source,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+  }
+}
+
 function normalizeRawItem(item: RawItem): RawItem {
   return {
     ...item,
@@ -101,6 +152,7 @@ export const useOpportunityStore = create<OpportunityState>((set, get) => ({
 
   loadAll: async () => {
     set({ isLoading: true });
+    await ensureDefaultSources();
     const [sources, rawItems, opportunities, experiments] = await Promise.all([
       db.sources.orderBy("updatedAt").reverse().toArray(),
       db.rawItems.orderBy("fetchedAt").reverse().toArray(),
